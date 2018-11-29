@@ -80,7 +80,7 @@ svc()
 					请求正排服务
 
 		CCachePolicy::instance()->getConvertContentResult(req)作用：阻塞等待解析结果。
-
+		
 HITCACHE_CACHEENTRY：如何确定命中了一部分？？
 
 hit1：HITCACHE_NONE，无倒排cache,  首次访问的query。
