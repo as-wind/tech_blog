@@ -1,6 +1,8 @@
 web cache主干
+===
 
 main()
+=====
 	assemblePipeline（）	// 组装pipeline
 		CCachePipeline::open（）// 注册15个ACE_Module，
 	csvc->open() 	 // 启动cache serverice 
@@ -9,6 +11,7 @@ main()
 CCacheService
 =============
 open()
+----
 	配置服务端口，log server，
 	连接redis服务         //  百度问问结果替换为搜狗问问，存储对应关系
 	qdbAgent->open()  // 初始化
@@ -18,8 +21,10 @@ open()
 CCacheHandler
 ==============
 open()
+----
 	activate()  // 自己激活自己
 svc()	
+---
 	handleSuccessRequest(CCacheQueuedRequest* req, std::string* request)
 		req->request.swap(*request); // 将search_hub的请求存储到了CCacheQueuedRequest的request成员中。
 
@@ -30,61 +35,39 @@ CLocalSearchTask
 cacheID 是search_hub计算后传过来的 
 
 svc()
-
+---
 	req->parseRequest() //解析请求
-  
 	dispatchCCacheQueuedRequest // 查local cache，分发请求，是localSearch 的主要逻辑
-  
 		if searchtype == URLLOOKUP :  
-    
 			 // urllookup 含义：summary的key是通过url计算得到的，所以直接查询summary即可
-       
 			请求summary服务。 // CSend2QueryTask::instance()->put函数中根据shouldQuery_确定是否请求summary服务
       
 		NORMQUERY:
-    
 		SITEQUERY1:
-    
-		SITEQUERY2:
-    
+		SITEQUERY2:   
 			ReadCacheEntry；  //  读cache
-      
 			如果isLocationalRequest，则更新cacheID（只在二查时更新）
-      
 			query cache没命中：
-      
-				if  interOnly：
-        
-					直接返回空        //  interOnly 含义：特殊请求，只查缓存，减小压力。
-          
-				if cacheLevel == 1：
-        
-					直接返回空     // cacheLevel从seach_hub传来的参数，特殊渠道请求，只查缓存。
-          
-				else 
-        
-					准备请求倒排服务
-          
+				if  interOnly：  
+					直接返回空        //  interOnly 含义：特殊请求，只查缓存，减小压力。   
+				if cacheLevel == 1：   
+					直接返回空     // cacheLevel从seach_hub传来的参数，特殊渠道请求，只查缓存。      
+				else  
+					准备请求倒排服务     
 			query cache命中：
-      
 				(1)  过期，准备请求倒排服务；
-						setAllInstQueryExpired()中设置了请求倒排标记
-            
+						setAllInstQueryExpired()中设置了请求倒排标记      
 				(2) 查询结果不够，准备请求倒排服务；
-						在not_enough(req) 中设置了请求倒排标记
-            
-				(3)  cacheRequest.needdump_，排查用，debug
-					
+						在not_enough(req) 中设置了请求倒排标记      
+				(3)  cacheRequest.needdump_，排查用，debug				
 				(4) if is_HitAll , 判断函数中访问了正排cache
 						做了读取summary cache的动作，太隐蔽了！
 						hit4, hit5，命中summary cache，读取了结果后直接返回。
 						CCachePolicy::judge_summary
 							CQdbAgent::instance()->LoadSummaryContent
-
 				(5) else if req->shouldSummary_ // 需要请求summary server
 						CQdbAgent::instance()->LoadSummaryContent
 
-	
 			if shouldQuery_	// 需要请求query server
 				if cacheLevel == 1:  // hitcache2
 					只请求summary服务
@@ -245,6 +228,7 @@ svc()
 CSend2SummaryTask
 ==================
 put()
+---
 	CCachePolicy::instance()->makeSummaryRequests
 	sendSummaryRequest()
 
@@ -305,7 +289,6 @@ loadSummaryServers  // 加载summary服务器的配置到内存中
 
 成员变量：
 summaryServerGroup_t  summaryServerGroups[MaxSummaryGroupCount];  // summary集群配置信息
-
 
 
 CCacheDirectory  // 管理cahce_id，防止重复访问
