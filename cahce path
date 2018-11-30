@@ -1,0 +1,15 @@
+mailto=wangmang@sogou-inc.com;sunfumin@sogou-inc.com;tubojun@sogou-inc.com;liuweimin@sogou-inc.com;huoshuaisiss2030@sogou-inc.com;lixiang214844@sogou-inc.com;yaoting@sogou-inc.com;caishaoyang@sogou-inc.com;jinxin215691@sogou-inc.com;shixiang@sogou-inc.com
+build_requires=openblas-devel armadillo-devel armadillo arpack arpack-devel hdf5-devel lzo-devel sasn1b-devel ace-devel ssplatform2-devel sohumisc-devel libevent-devel xerces-c-devel qdb-offdb qdb-devel memcached-devel libmemcached-devel protobuf-devel lksctp-tools lksctp-tools-devel libcurl-devel libxml2-devel json-c-devel lz4-devel hiredis-devel
+
+
+[main.svn].=http://svn.sogou-inc.com/svn/websearch4/web/web_cache/tags/web.web_cache.20181120.d
+web_analysis=http://svn.sogou-inc.com/svn/websearch4/web/web_analysis/tags/web.web_analysis.20170503.a
+web_base=http://svn.sogou-inc.com/svn/websearch4/web/web_base/tags/web.web_base.20181030.a
+word_segmentor=http://svn.sogou-inc.com/svn/word_segmentor/CoreSegmentor/tags/coresegmentor_xml_4.18.20121127.a
+ssplatform-encoding=http://svn.sogou-inc.com/svn/rd_modules/encoding/tags/ssplatform-encoding.web.20150304.a
+urlinfo=http://svn.sogou-inc.com/svn/rd_modules/urlinfo/tags/web.urlinfo.20160601.a
+web_tpage=http://svn.sogou-inc.com/svn/websearch4/web/web_tpage/tags/web.web_tpage.20130311.a
+web_tflag=http://svn.sogou-inc.com/svn/websearch4/web/web_tflag/tags/web.web_tflag.20151111.a
+dicmap=http://svn.sogou-inc.com/svn/websearch4/web/web_segmentor_dicmap/tags/dicmap_xml_20130106.a
+librdkafka=http://svn.sogou-inc.com/svn/websearch4/data_platform/framework/librdkafka/tags/librdkafka-0.8.5-20150330.c
+zstd=http://svn.sogou-inc.com/svn/websearch4/web/customize/zstd/tags/web.zstd.20160927.a
