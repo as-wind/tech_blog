@@ -1,6 +1,5 @@
 
 1.	Pipeline类
-
 ===
 
 1.1	main()
@@ -709,6 +708,7 @@ qc = 2,  // 什么意思
 news_update_ = 3,
 
 5.6	地域性查询
+---
 实现查询的地域相关性，即同一个query在不同地域查询，得到的结果不一样。
 查cache逻辑：
 先用cache_id查query cahe，在查出query cache后，判断是地域相关，则生成地域相关cache_id。后续用地域相关cache_id去生成cache key，查query cache和summary cache。
