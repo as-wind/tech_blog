@@ -59,47 +59,70 @@ ReadCacheEntry(newCacheID)  // 读取地域相关query cache
 				if  interOnly || cacheLevel == 1：
 					直接返回空    // 特殊请求，只查缓存，减小压力。
 				else 
-					req->hitCache_ = HITCACHE_NONE
-					标记请求倒排服务。
+					req->hitCache_ = HITCACHE_NONE  // hit1
+					set needQuery_ , 标记请求倒排服务。
 			query cache命中： // 检查访问query/summary服务的条件，设置标记
-req->hitCache_ = HITCACHE_CACHEENTRY // 初始化为命中部分
-query group
+req->hitCache_ = HITCACHE_CACHEENTRY // 初始化为 hit2
+命中部分query group
 if CCachePolicy::isExpired // 过期，准备请求query server；
-						setAllInstQueryExpired()中设置了请求倒排标记
-				else if 查询结果不够，准备请求query server；
-						在not_enough(req) 中设置了请求倒排标记
-				else if is_HitAll , 在判断函数中访问了summary cache
-						做了读取summary cache的动作，太隐蔽了！
-						hit4, hit5，命中summary cache，读取结果后直接返回。
-						CCachePolicy::judge_summary
-							CQdbAgent::LoadSummaryContent
-							if load成功：
+					setAllInstQueryExpired()中设置请求倒排标记, set needQuery_
+					shouldSummary_ = true
+				else if 结果不够，准备请求query server；
+					在not_enough(req) 中设置请求倒排标记, set needQuery_
+					shouldSummary_ = true
+				else if is_HitAll  //在判断函数中LoadSummaryContent
+					Is_HitAll逻辑：
+					CCachePolicy::judge_summary()
+						CQdbAgent::LoadSummaryContent
+						if load成功：
+							shouldSummary_ = false
 hitCache_ = HITCACHE_ALL / HITCACHE_MEM;
-							else
-								hitCache_ = HITCACHE_DOCID
-				if req->shouldSummary_ // 需要请求summary server
-						CQdbAgent::instance()->LoadSummaryContent
-	
-			if shouldQuery_	// 需要请求query server
-				if cacheLevel == 1:  // hitcache2
-					只请求summary服务
-				else 
-					请求倒排服务
-			else
-				if eplace_url: 
-req->hitCache_ = HITCACHE_DOCID;
-					CPreMergeQueryTask
-				else
-					请求正排服务
+						else
+							shouldSummary_ = true
+							hitCache_ = HITCACHE_DOCID // hit3
+CCachePolicy::should_summary()
+	if shouldSummary_ == false 
+if getConvertContentResult成功 // 阻塞
+			CReplyTask::put()  // hit4, hit5，直接返回。
+							else 失败
+			CSend2QueryTask::put() // 重试
+{
+	//走到这里的逻辑是不需要请求query/summary server的
+return  // hit4, hit5，直接返回。
+}
 
-CCachePolicy::instance()->getConvertContentResult(req) 作用：阻塞等待解析结果。
+				// 处理hit2, hit3，hit3表示读summary cache失败了，再读一次？
+				// 如果需要请求query server, 此时load summary cache无意义
+				if req->shouldSummary_ // 需要请求summary server
+					CQdbAgent::LoadSummaryContent
+	
+// 后面逻辑处理的是hit1，hit2，hit3的情况
+// 是需要请求query / summary 服务的逻辑
+			if shouldQuery_
+				if cacheLevel == 1: 
+					getConvertContentResult()  //阻塞
+					CSend2SummaryTask::put() //只请求summary服务
+				else 
+					CSend2QueryTask::put()
+			else
+				if replace_url: 
+req->hitCache_ = HITCACHE_DOCID;
+					CPreMergeQueryTask::put()
+				else
+					CSend2SummaryTask::put()
+
+CCachePolicy::instance()->getConvertContentResult(req) 作用：
+(1)	先阻塞等待query content的解析；
+loadConentDbData中启动的异步任务，负责解析query cache的PB结果到cache_content中。
+(2)	再阻塞等待fillInternalQueryResult；
+实际是解析query server返回的结果到cache_content中。（在CollectQueryTask中设置的延迟任务/同步任务）
+entry的解析未阻塞。
 
 hit1：HITCACHE_NONE，无倒排cache,  首次访问的query。
 hit2：HITCACHE_CACHEENTRY，命中query cache，但是部分过期,或等效于过期
 hit3：HITCACHE_DOCID，倒排cache正常，但无正排cache，一般为翻页请求
 						   1 读summary cache失败时设置
                                        2 在CReplyVerifier::check中发现黑名单URL时设置
-
 hit4：HITCACHE_ALL，  命中倒排cache、以及硬盘中正排cache。
 hit5：HITCACHE_MEM，命中倒排cache、以及内存中正排cache。
 
@@ -142,7 +165,7 @@ CollectQueryTask::svc()
 	deserialization()  // 初步解析返回结果，存储在InternalQueryResult中
 		CCachePolicy::decode_queryresult()
 			cache_result::decode() //解析到InternalQueryResult::_query_result中
-	fillInternalQueryResult  // 异步deferred task记录到 req->ffill_query_result中
+	fillInternalQueryResult  // deferred task记录到 req->ffill_query_result中
 		req->fillQueryResult // 最终解析到 req->cache_content_中
 	put_next  // ACE函数，传递到下级流水
 
@@ -342,9 +365,10 @@ CQdbAgent::UpdateCacheContent
     
 	CacheReqPipeStat stat_;  // 当前请求处于流水的哪个部分
 	CacheEntry entry_;
-	CacheContent* cache_content_;
+	CacheContent* cache_content_; // 内含query_result
 
-	CacheRequest  cacheRequest //存储cache查询的请求信息，存储从search_hub收到请求消息的大部分参数。
+	CacheRequest  cacheRequest //存储cache查询的请求信息，存储从
+search_hub收到请求消息的大部分参数。
 	query::QueryRequest  queryRequest //
 	CacheControlRequest controlRequest //
 
@@ -352,7 +376,18 @@ CQdbAgent::UpdateCacheContent
    	InternalSummaryResult * title_summary_result_[MAX_SUMMARY_INDEX];
     	InternalSummaryResult * wenda_summary_result_[MAX_SUMMARY_INDEX];
 
-2.2	CacheOptions
+fillQueryResult() //填充cache_content中与每个group相关的字段，更新query_result
+
+2.2	CCacheQueuedRequestManager
+---
+ACE_Allocator* allocator_; // 用于分配request，固定大小，为什么不用
+ACE_Cached_Allocator？
+
+request_board_   // 记录缓存的request，是个hash_map数组，大小为61，根据request_id%61，将request分配到这61个hash_map中。当收到query server的response时，用于找到对应的request
+
+HotQuery: 热搜，由算法根据doc查询频率实施计算出某个query是否属于热搜
+
+2.3	CacheOptions
 ---
 // 加载config信息
 loadSummaryServers  // 加载summary服务器的配置到内存中
@@ -360,7 +395,7 @@ loadSummaryServers  // 加载summary服务器的配置到内存中
 成员变量：
 summaryServerGroup_t  summaryServerGroups[MaxSummaryGroupCount];  // summary集群配置信息
 
-2.3	CCachePolicy 
+2.4	CCachePolicy 
 ---
 // 实现各级流水间request与response处理相关逻辑
 std::queue<CCacheQueuedRequest*> req_queue_; // 维护一个请求池，缓存用，避免频繁申请释放
@@ -368,14 +403,13 @@ std::queue<CCacheQueuedRequest*> req_queue_; // 维护一个请求池，缓存�
 loadConentDbData()  
 pb_entry->ParseFromArray  // 先解析CacheEntry
 如果entry中信息显示为地域请求，且cache_id没有被更新，则返回 
-但是地域相关的entry怎么被非地域cahe_id检索到的？
 
       // 异步解析CacheContent，解析结果记录在fconvert_content中    
 	req->fconvert_content = std::async(std::launch::async, […]() {
 pb_content->ParseFromArray  // 解析CacheContent
 }
 
-2.4	CQueryMerger
+2.5	CQueryMerger
 ---
 query::DocIdResult * ids_[MaxQueryGroupCount];  // 记录doc id 结果
 
@@ -418,7 +452,7 @@ setRerankOutput(rerank_output, req);
 
 requery_level是什么？
 
-2.5	CCacheFilter
+2.6	CCacheFilter
 ---
 filter
 	cache_content_->qc_hit_cache = qc_assess.assessQC
@@ -451,7 +485,7 @@ filter
 saveFilterDoc(req, uniqueFlag, num, "filter_url", filter_docs);
 含义：uniqueFlag doc标记是否被过滤，被过滤掉的doc记录到filter_doc中
 
-2.6	CReplyVerifier
+2.7	CReplyVerifier
 ---
 check
 	verifier_getstate（）// 批量校验多个url
@@ -493,14 +527,7 @@ MaxQueryResultSize = sizeof(QueryResult) + sizeof(DocIdResult)*1000;
 struct QueryResult {
 	DocIdResult doc[];
 };
-
-3.5	CCacheQueuedRequestManager
----=
-request_board_   // 是个map的数组，记录缓存的request
-
-HotQuery: 热搜，由算法根据doc查询频率实施计算出某个query是否属于热搜
-
-3.6	pooler
+3.5	pooler
 ---
 每个pooler对应一个epool监听线程，可以监听多个socket，并缓存消息。
 poller_add(const struct poller_data *data, poller_t *poller)
@@ -515,7 +542,7 @@ __poller_thread_routine (poller）
 		__poller_add_result(node, poller);  // 结果存储到队列里（poller->params.result_queue）
 	__poller_handle_listen
 
-3.7	mpooler 
+3.6	mpooler 
 ---
 // Multi Pooler，不是类
 
@@ -524,12 +551,12 @@ mpoller_t *mpoller_create(const struct mpoller_params *params)
 	__mpoller_create(mpoller_t *mpoller)    // 创建多个pooler
 		mpoller->poller[i] = poller_create(&params);
 
-3.8	Mpoller
+3.7	Mpoller
 ---
 封装了成员 mpoller_t *mpoller_;
 get_message(void *buf, size_t *len, int timeout)
 
-3.9	MTransport 
+3.8	MTransport 
 ---
 // 底层socket封装，代表一个链接
 
@@ -544,12 +571,24 @@ get_message(void *buf, size_t *len, int timeout)
 4.3	SummaryContent
 ---
 用于缓存每个页面中各条Doc的摘要及其他相关信息。
-4.4	cache_id
+4.4	Query_request
+描述了Cache发给Query Server的请求
+
+4.5	QueryResult
+描述了从Query Server返回的结果
+
+4.6	summary_request
+描述了Cache发给Summary的请求。从直观的理解，所谓的Summary请求，就是拿这Query结果Doclist中docid到Summary中找到相应的网页，然后根据关键词，利用网页的内容，生成摘要的标题和摘要的内容。
+
+4.7	summary_result
+此结构描述了Summary返回的结果
+
+4.8	cache_id
 ---
 fillCacheIDByString()，从search_hub请求中hash字段解析得到。
 hash —> cache id
 
-4.5	cache_key
+4.9	cache_key
 ---
 getKeyByCacheID()
 
@@ -559,22 +598,22 @@ Summary cache key:  s + cache_id + 页数
 query server 查询的key ?
 Summary server查询的key : doc id
 
-4.6	request_id
+4.10	request_id
 ---
 标识一条request, 用于从respons查找到对应的CCacheQueuedRequest
 
-4.7	summary_id
----=
+4.11	summary_id
+---
 summary_id = request_id : summary_type : summary_index
 承载了request_id (bit 33~64) ，summary_type (bit 17～32) 与summary_index (bit 1~16）
 
-4.8	summary_index 
----=
+4.12	summary_index 
+---
 summary 在summary_result_中的存储下标
 req->summary_result_[summary_index] 
 
-4.9	queryServerGroup_t 
----=
+4.13	queryServerGroup_t 
+---
 queryServerGroups[MaxQueryGroupCount]
 含义：表示一个分片，按doc id划分
     BYTE updateStrategy;             //<更新策略
@@ -616,7 +655,9 @@ REQUERY_TIME = 4;   // 时效性二次
       return localization_level;
  }
 
-5.4	cache过期(更新)判断
+5.4	Cache更新判断isToUpdate
+
+5.5	cache过期(更新)判断
 ---
 bool CCachePolicy::isExpired(CCacheQueuedRequest *req, 
 int now, 
@@ -665,7 +706,7 @@ auto_update_ = 1,
 qc = 2,  // 什么意思
 news_update_ = 3,
 
-5.5	地域性查询
+5.6	地域性查询
 实现查询的地域相关性，即同一个query在不同地域查询，得到的结果不一样。
 查cache逻辑：
 先用cache_id查query cahe，在查出query cache后，判断是地域相关，则生成地域相关cache_id。后续用地域相关cache_id去生成cache key，查query cache和summary cache。
@@ -680,8 +721,6 @@ Merge后会由rerank_output带出此次查询是否是地域性查询，并记�
 4 search_hub的请求是并行处理的么？在哪体现的？
 5 固排有一个单独的query server, 在哪？
 7 memdb memcache cache机制
-8 CCachePolicy::isExpired 逻辑
-
 9 hot_query_client ?
 10 getSummaryFetchLevel   fetch level 什么意思？
 11 服务器规格：cpu 内存
@@ -691,7 +730,7 @@ Merge后会由rerank_output带出此次查询是否是地域性查询，并记�
 
 13 聚合逻辑
 14 CCachePolicy::isToUpdate 逻辑
-15 getConvertContentResult 阻塞的内容
+15 Summary server的备份机制？
 
 13 含义：
 enum SearchType{
@@ -708,7 +747,7 @@ enum SearchType{
     QUICKSHARE      //为quickshare项目单独接口
 };
 
-7.	可改进点
+7.	优化点
 ===
 1 PB arena
 2 RPC框架
@@ -718,6 +757,7 @@ enum SearchType{
     当线程数量固定，不会频繁创建退出的时候， 可以使用jemalloc；反之使用tcmalloc可能是更好的选择。
 5 数据性能分析可视化, Grafana. Kibana. es
 6 每个流水任务至少是一个线程，需要读队列的开销，直接调用会更高效
+7 使用内存池代替固定size的内存分配，目前cache_content用的malloc分配，CacheQueuedRequest用的ACE_Allocator分配。
 
 
 
