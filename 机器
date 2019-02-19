@@ -1,0 +1,60 @@
+开发环境
+
+虚拟机：root@10.142.38.170
+密.  码：noSafeNoWork@2018
+
+虚拟机2: root@10.134.17.228
+密码：    noSafeNoWork@2018
+
+物理机：root@psarch05.web.sjs.ted
+密.  码： WebCds@2014
+
+线上机器：用户名 guest
+密.     码：Sogou@)!$
+部署路径：/search/odin/daemon/cache
+                    conf/cache.cfg 
+
+中        控：查机房一致性问题
+yuanbaoan@search.console.tc.ted
+/search/yuanbaoan/consistency_shell
+
+
+固排环境：
+http://umis.sogou-inc.com/
+psarch03.web.sjs.ted:/search/ted/manual_mquery  // 已经部署的系统
+http://svn.sogou-inc.com/svn/websearch4/vr/trunk // 代码位置
+screen -r 13328
+
+=========
+
+consist01.web.sjs.ted
+/search/odin/daemon/sggp
+宋南  16:54:38
+start_cache.sh
+noSafeNoWork@2014
+
+王美艳机器：
+10.134.83.31
+noSafeNoWork@2014
+/search/odin/wangmeiyan/cache_wm
+
+yum list | grep ace
+cat /etc/redhat-release
+yum install ace-devel.x86_64
+Yum reinstall *** -y
+ldd libmysqlclient.so.16 
+
+
+cache 的历史log从晨曦获取：晨曦机群，目前是双传内蒙和江苏，建议用江苏的
+hadoop fs -ls
+hadoop fs -get
+
+目录：
+/storage/sogou/web/1gd-web-cache
+/storage/sogou/web/djt-web-cache
+/storage/sogou/web/gd-web-cache
+/storage/sogou/web/js-web-cache
+/storage/sogou/web/sjs-web-cache
+/storage/sogou/web/tc1-web-cache
+
+http://dev.sogou-inc.com/   这个是申贤强那边提供的页面，里面有晨曦客户端安装脚本
