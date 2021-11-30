@@ -1,0 +1,112 @@
+https://github.com/CppExercises/ex2.2
+template 是可以嵌套定义的, 模板参数是有结构的.
+
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
+#include <vector>
+#include <numeric>
+#include <iostream>
+
+template<class T>
+class Distribution
+{
+  public: 
+    T mean;
+    T stddev;
+    using value_type = T;
+    Distribution(T mean, T stddev);
+    // Distribution(const std::vector<T> &data);
+
+    // Question why I can not use class T here like this?
+    // template <template <class T> class CONTAINER = std::vector>
+    template <template <class U> class CONTAINER = std::vector>
+    Distribution(const CONTAINER<T> &data);
+
+}; 
+
+template<class T>
+Distribution<T>::Distribution (T mean, T stddev)
+{
+  this->mean = mean;
+  this->stddev = stddev;
+}
+
+/*
+// task 1 only for vector
+template<class T>
+Distribution<T>::Distribution(const std::vector<T> &data)
+{
+  // get vector size
+  int size = data.size();
+  // initialize sum
+  T sum = data[0];
+  for (int i = 1; i < size; ++i)
+  {
+    sum = sum + data[i];
+  }
+  // use a variable to save because we will use it later.
+  T mean = sum / size;
+  // T sum = accumulate(data.begin(), data.end(), 0);
+  this->mean = mean;
+  // reset and initialize sum
+  sum = (data[0] - mean) * (data[0] - mean);
+  for (int i = 1; i < size; ++i)
+  {
+    sum = sum + (data[i] - mean) * (data[i] - mean);
+  }
+  T dev = sum / size;
+  this->stddev = sqrt(dev);
+}
+*/
+
+
+// task 2 for all possible given STL containers
+// we can not use the std::algorithm because there is a particular data structure SpaceVector
+// I used std::accumulate before then it failed. I think because the algorithm wrote base on STL while the SpaceVector doesn't match it.
+template<class T>
+template <template <class U> class CONTAINER>
+Distribution<T>::Distribution(const CONTAINER<T> &data)
+{
+  int size = 0;
+  T sum = 0;
+
+  // sum
+  for (auto &i : data)
+  {
+    size += 1;
+    sum = sum + i;
+  }
+
+  // use a variable to save because we will use it later.
+  T mean = sum / size;
+  this->mean = mean;
+
+  // reset sum
+  sum = 0;
+
+  for (auto &i : data)
+  {
+    sum = sum + (i - mean) * (i - mean);
+  }
+  T dev = sum / size;
+  this->stddev = sqrt(dev);
+}
+
+
+/*
+  Part 1:
+  Implement a type "Distribution" here with the following properties:
+  - "Distribution" should be a class template with a single template type
+  - two public member variables "mean" and "stddev"
+  - public member typedef "value_type" which aliases the template parameter
+  - two constructors:
+    - Distribution(T mean, T stddev) which sets the two member variables
+    - Distribution(const std::vector<T> &data) which calculates
+      the two member variables from a Distribution of data
+  Part 2:
+  Change the constructor "Distribution(const std::vector<T>&)" so it
+  accepts any STL data structure (not just std::vector) and
+  the class template parameter T is still deduced automatically,
+  so an object can be constructed using "Distribution(<anySTLcontainer>)"
+*/
