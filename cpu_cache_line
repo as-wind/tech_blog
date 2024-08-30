@@ -1,0 +1,114 @@
+https://zzqcn.github.io/perf/cpu_cache.html
+
+
+http://www.parallellabs.com/2010/03/06/why-should-programmer-care-about-sequential-consistency-rather-than-cache-coherence/
+
+https://preshing.com/20120710/memory-barriers-are-like-source-control-operations/
+https://chonghw.github.io/blog/2016/09/28/acquireandrelease/
+
+
+https://dengking.github.io/Hardware/
+https://dengking.github.io/Hardware/CPU-memory-access/CPU-cache-memory/TODO-zhihu-%E9%AB%98%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B-%E5%A4%9A%E5%A4%84%E7%90%86%E5%99%A8%E7%BC%96%E7%A8%8B%E4%B8%AD%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7%E9%97%AE%E9%A2%98/1/
+
+https://course.ece.cmu.edu/~ece847c/S15/lib/exe/fetch.php?media=part2_2_sorin12.pdf
+https://gfxcourses.stanford.edu/cs149/fall23content/media/locksconsistency/12_consistency.pdf
+
+https://wudaijun.com/2019/04/cache-coherence-and-memory-consistency/
+
+
+Fix false sharing:
+Base   : 2361288 
+	https://osj-ngm-04-prd.cec.lab.emc.com/job/Performance/job/Trident/job/Performance_test/33274/console
+	VD_PERF | http://bluma-shorty.xiolab.lab.emc.com/6DSf1o3Icg |
+	
+
+Test-1 : 2364598
+https://osj-ngm-04-prd.cec.lab.emc.com/job/Performance/job/Trident/job/Performance_test/33349/
+
+
+
+
+▪ The cache coherency problem exists because hardware implements the optimization of duplicating data in multiple processor caches. The copies of the data must be kept coherent. 
+
+▪ Relaxed memory consistency issues arise from the optimization of reordering memory operations. (Consistency is unrelated to whether or not caches exist in the system)
+
+
+X86 CPU 上具有锁定一个特定内存地址的能力, 在某些汇编指令上使用LOCK前缀 实现。当使用 LOCK 指令前缀时，它会使 CPU 宣告一个 LOCK# 信号，这样就能确保在多处理器系统或多线程竞争的环境下互斥地使用这个内存地址。指令执行完毕，锁自动释放。支持使用LOCK前缀的指令有ADD/OR/AND/SUB/INC/NOT等，另外XCHG/XADD自带LOCK效果。除此之外，LOCK指令还有禁止该指令与之前和之后的读和写指令重排序、把Store Buffer中的所有数据刷新到内存中的功能（可见性），是实现内存屏障的方式之一。总之，LOCK前缀提供了原子性和可见性保证。
+
+Intel document
+------------------
+The LOCK prefix invokes a locked (atomic) read-modify-write operation when modifying a memory operand. This mechanism is used to allow reliable communications between processors in multiprocessor systems, as described below: 
+• In the Pentium processor and earlier IA-32 processors, the LOCK prefix causes the processor to assert the LOCK# signal during the instruction. This always causes an explicit bus lock to occur. 
+• In the Pentium 4, Intel Xeon, and P6 family processors, the locking operation is handled with either a cache lock or bus lock. If a memory access is cacheable and affects only a single cache line, a cache lock is invoked and the system bus and the actual memory location in system memory are not locked during the operation. Here, other Pentium 4, Intel Xeon, or P6 family processors on the bus write-back any modified data and invalidate their caches as necessary to maintain system memory coherency. If the memory access is not cacheable and/or it crosses a cache line boundary, the processor’s LOCK# sig
+
+--------------
+The Intel 64 and IA-32 architectures provide several mechanisms for strengthening or weakening the memory ordering model to handle special programming situations. These mechanisms include:
+
+Memory mapped devices and other I/O devices on the bus are often sensitive to the order of writes to their I/O buffers. I/O instructions can be used to (the IN and OUT instructions) impose strong write ordering on such accesses as follows. Prior to executing an I/O instruction, the processor waits for all previous instructions in the program to complete and for all buffered writes to drain to memory. Only instruction fetch and page tables walks can pass I/O instructions. Execution of subsequent instructions do not begin until the processor determines that the I/O instruction has been completed. 
+
+Synchronization mechanisms in multiple-processor systems may depend upon a strong memory-ordering model. Here, a program can use a locked instruction such as the XCHG instruction or the LOCK prefix to ensure that a read-modify-write operation on memory is carried out atomically. Locked instructions typically operate like I/O instructions in that they wait for all previous memory accesses to complete and for all buffered writes to drain to memory (see Section 9.1.2, “Bus Locking”). Unlike I/O operations, locked instructions do not wait for all previous instructions to complete execution. 
+
+Program synchronization can also be carried out with serializing instructions (see Section 9.3). These instructions are typically used at critical procedure or task boundaries to force completion of all previous instructions before a jump to a new section of code or a context switch occurs. Like the I/O instructions, the processor waits until all previous instructions have been completed and all buffered writes have been drained to memory before executing the serializing instruction.
+
+The SFENCE, LFENCE, and MFENCE instructions provide a performance-efficient way of ensuring load and store memory ordering between routines that produce weakly-ordered results and routines that consume that data
+- mm_lfence (“load fence” : wait for all loads to complete) 
+- mm_sfence (“store fence”: wait for all stores to complete) 
+- mm_mfence (“mem fence”  : wait for all mem operations to complete)
+
+· Why need memory barrier
+https://cxd2014.github.io/2018/05/22/memory-barrier/
+
+另外一种解决方法是使用CPU指令来阻止读写内存的顺序发送改变。在x86/64处理器中有几个指令可以做这件事，mfence指令是一个完全的内存屏障， 不管是读内存还是写内存它都会防止乱序执行。（译者注：lfence读内存屏障，sfence写内存屏障）
+
+有趣的是x86/64处理器中不只mfence这一个完全的内存屏障指令。这些处理器中的任何locked指令，例如xchg也是一种完全的内存屏障 – 只要你不使用SSE指令集和 write-combined memory。事实上，当你使用Microsoft C++编译器中的内部函数MemoryBarrier时，至少在Visual Studio 2008中会生成xchg指令。
+mfence是x86/64处理特有的指令，如果你想让代码具备更好的可移植性，你可以使用一个宏来包装它。Linux内核中已经有这样的宏smp_mb以及其相关的宏smp_rmb和smp_wmb，并且在不同的架构下，这个宏的实现也是不同的。例如在PowerPC中smp_mb使用的是sync指令。
+
+不同的处理器族，都会有自己特有的内存屏障指令，编译器对每种处理器族提供不同的宏实现，因此对于跨平台项目还需要专门的适配层，这对于无锁编程一点也不友好。 这也是为什么C++11会引入atomic library，试图提供标准化接口使无锁编程变得更加简单。
+
+
+· linux memory barrier api
+http://www.rdrop.com/~paulmck/scalability/paper/whymb.2010.06.07c.pdf
+
+smp_wmb(): drain store buffer
+smp_rmb(): drain invalidate queue
+在AMD64架构上分别对应sfence、lfence, PowerPC中smp_mb使用的是sync指令.
+
+
+Thread 1:
+1 void foo(void) 
+2 { 
+3 a = 1; 
+4 smp_wmb(); // linux api, flush store buffer
+
+5 b = 1; 
+6 } 
+7 
+Thread:2
+8 void bar(void) 
+9 { 
+10 while (b == 0) continue; 
+11 smp_rmb(); // OS api, flush invalidate queue
+12 assert(a == 1); 
+13 } 
+
+
+· volatile注意事项：
+1.与平台无关的多线程程序，volatile几乎无用（Java和C#中的volatile除外）；
+2.volatile不保证原子性（一般需使用CPU提供的LOCK指令）；
+3.volatile不保证执行顺序；
+4.volatile不提供内存屏障（Memory Barrier）和内存栅栏（Memory Fence）；
+5.多核环境中内存的可见性和CPU执行顺序不能通过volatile来保障，而是依赖于CPU内存屏障。
+
+注：volatile诞生于单CPU核心时代，为保持兼容，一直只是针对编译器的，对CPU无影响。
+
+volatile在C/C++中的作用：
+1.告诉编译器不要将定义的变量优化掉；
+2.告诉编译器总是从内存地址中（cache line or memory）取被修饰的变量的值，而不是从寄存器取值。
+https://liam.page/2018/01/18/volatile-in-C-and-Cpp/
+
+
+	• volatile 不能解决多线程中的问题。
+	• 按照 Hans Boehm & Nick Maclaren 的总结，volatile 只在三种场合下是合适的。
+		○ 和信号处理（signal handler）相关的场合；
+		○ 和内存映射硬件（memory mapped hardware）相关的场合；
+		○ 和非本地跳转（setjmp 和 longjmp）相关的场合。
